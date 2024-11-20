@@ -10,6 +10,7 @@ import std;
 import vku;
 export import vulkan_hpp;
 import :math.extended_arithmetic;
+import :vulkan.shader.prefilteredmap_comp;
 
 namespace vk_gltf_viewer::vulkan::inline pipeline {
     export class PrefilteredmapComputer {
@@ -80,8 +81,8 @@ namespace vk_gltf_viewer::vulkan::inline pipeline {
                 {},
                 createPipelineStages(
                     device,
-                    vku::Shader::fromSpirvFile(
-                        COMPILED_SHADER_DIR "/prefilteredmap.comp.spv",
+                    vku::Shader {
+                        shader::prefilteredmap_comp(),
                         vk::ShaderStageFlagBits::eCompute,
                         vku::unsafeAddress(vk::SpecializationInfo {
                             vku::unsafeProxy({
@@ -89,7 +90,8 @@ namespace vk_gltf_viewer::vulkan::inline pipeline {
                                 vk::SpecializationMapEntry { 1, offsetof(SpecializationConstants, samples), sizeof(SpecializationConstants::samples) },
                             }),
                             vk::ArrayProxyNoTemporaries<const SpecializationConstants>(specializationConstants),
-                        }))).get()[0],
+                        }),
+                    }).get()[0],
                 *pipelineLayout,
             } } { }
 

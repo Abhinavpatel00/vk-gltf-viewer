@@ -2,6 +2,8 @@ export module vk_gltf_viewer:vulkan.pipeline.DepthRenderer;
 
 import vku;
 export import :vulkan.pl.PrimitiveNoShading;
+import :vulkan.shader.depth_vert;
+import :vulkan.shader.depth_frag;
 
 namespace vk_gltf_viewer::vulkan::inline pipeline {
     export struct DepthRenderer : vk::raii::Pipeline {
@@ -12,8 +14,8 @@ namespace vk_gltf_viewer::vulkan::inline pipeline {
                 vku::getDefaultGraphicsPipelineCreateInfo(
                     createPipelineStages(
                         device,
-                        vku::Shader::fromSpirvFile(COMPILED_SHADER_DIR "/depth.vert.spv", vk::ShaderStageFlagBits::eVertex),
-                        vku::Shader::fromSpirvFile(COMPILED_SHADER_DIR "/depth.frag.spv", vk::ShaderStageFlagBits::eFragment)).get(),
+                        vku::Shader { shader::depth_vert(), vk::ShaderStageFlagBits::eVertex },
+                        vku::Shader { shader::depth_frag(), vk::ShaderStageFlagBits::eFragment }).get(),
                     *layout, 1, true)
                     .setPDepthStencilState(vku::unsafeAddress(vk::PipelineDepthStencilStateCreateInfo {
                         {},

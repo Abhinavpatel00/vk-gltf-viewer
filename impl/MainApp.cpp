@@ -260,12 +260,11 @@ void vk_gltf_viewer::MainApp::run() {
             imguiTaskCollector.inputControl(appState.camera, appState.automaticNearFarPlaneAdjustment, appState.useFrustumCulling, appState.hoveringNodeOutline, appState.selectedNodeOutline);
             imguiTaskCollector.imguizmo(appState.camera, appState.gltfAsset.and_then([this](auto &x) {
                 return value_if(x.selectedNodeIndices.size() == 1, [&]() {
-                    return std::tuple<fastgltf::Asset&, std::span<const glm::mat4>, std::uint16_t, ImGuizmo::OPERATION> {
+                    return std::tie(
                         x.asset,
                         gltf->sceneHierarchy.nodeWorldTransforms,
                         *x.selectedNodeIndices.begin(),
-                        appState.imGuizmoOperation,
-                    };
+                        appState.imGuizmoOperation);
                 });
             }));
         }

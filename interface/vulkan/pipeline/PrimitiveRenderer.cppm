@@ -3,6 +3,8 @@ export module vk_gltf_viewer:vulkan.pipeline.PrimitiveRenderer;
 import vku;
 export import :vulkan.pl.Primitive;
 export import :vulkan.rp.Scene;
+import :vulkan.shader.primitive_vert;
+import :vulkan.shader.primitive_frag;
 
 namespace vk_gltf_viewer::vulkan::inline pipeline {
     export struct PrimitiveRenderer : vk::raii::Pipeline {
@@ -13,8 +15,8 @@ namespace vk_gltf_viewer::vulkan::inline pipeline {
         ) : Pipeline { device, nullptr, vku::getDefaultGraphicsPipelineCreateInfo(
                 createPipelineStages(
                     device,
-                    vku::Shader::fromSpirvFile(COMPILED_SHADER_DIR "/primitive.vert.spv", vk::ShaderStageFlagBits::eVertex),
-                    vku::Shader::fromSpirvFile(COMPILED_SHADER_DIR "/primitive.frag.spv", vk::ShaderStageFlagBits::eFragment)).get(),
+                    vku::Shader { shader::primitive_vert(), vk::ShaderStageFlagBits::eVertex },
+                    vku::Shader { shader::primitive_frag(), vk::ShaderStageFlagBits::eFragment }).get(),
                 *layout, 1, true, vk::SampleCountFlagBits::e4)
             .setPDepthStencilState(vku::unsafeAddress(vk::PipelineDepthStencilStateCreateInfo {
                 {},

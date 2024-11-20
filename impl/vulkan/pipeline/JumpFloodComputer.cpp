@@ -4,6 +4,7 @@ module;
 
 module vk_gltf_viewer;
 import :vulkan.pipeline.JumpFloodComputer;
+import :vulkan.shader.jump_flood_comp;
 
 import std;
 import :math.extended_arithmetic;
@@ -38,7 +39,7 @@ vk_gltf_viewer::vulkan::pipeline::JumpFloodComputer::JumpFloodComputer(
         {},
         createPipelineStages(
             device,
-            vku::Shader::fromSpirvFile(COMPILED_SHADER_DIR "/jump_flood.comp.spv", vk::ShaderStageFlagBits::eCompute)).get()[0],
+            vku::Shader { shader::jump_flood_comp(), vk::ShaderStageFlagBits::eCompute }).get()[0],
         *pipelineLayout,
     } } { }
 

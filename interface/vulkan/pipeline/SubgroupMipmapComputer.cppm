@@ -9,6 +9,9 @@ export module vk_gltf_viewer:vulkan.pipeline.SubgroupMipmapComputer;
 import std;
 import :helpers.ranges;
 export import :vulkan.Gpu;
+import :vulkan.shader.subgroup_mipmap_16_comp;
+import :vulkan.shader.subgroup_mipmap_32_comp;
+import :vulkan.shader.subgroup_mipmap_64_comp;
 
 namespace vk_gltf_viewer::vulkan::inline pipeline {
     export class SubgroupMipmapComputer {
@@ -56,7 +59,17 @@ namespace vk_gltf_viewer::vulkan::inline pipeline {
                 {},
                 createPipelineStages(
                     gpu.device,
-                    vku::Shader::fromSpirvFile(std::format(COMPILED_SHADER_DIR "/subgroup_mipmap_{}.comp.spv", gpu.subgroupSize), vk::ShaderStageFlagBits::eCompute)).get()[0],
+                    vku::Shader {
+                        [&]() {
+                            switch (gpu.subgroupSize) {
+                                case 16U: return shader::subgroup_mipmap_16_comp();
+                                case 32U: return shader::subgroup_mipmap_32_comp();
+                                case 64U: return shader::subgroup_mipmap_64_comp();
+                            }
+                            std::unreachable(); // Logic error! This situation must be handled from vulkan::GPU construction.
+                        }(),
+                        vk::ShaderStageFlagBits::eCompute,
+                    }).get()[0],
                 *pipelineLayout,
             } } { }
 

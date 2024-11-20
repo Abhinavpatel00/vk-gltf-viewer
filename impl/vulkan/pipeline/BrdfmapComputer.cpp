@@ -4,6 +4,7 @@ module;
 
 module vk_gltf_viewer;
 import :vulkan.pipeline.BrdfmapComputer;
+import :vulkan.shader.brdfmap_comp;
 
 import std;
 
@@ -29,13 +30,14 @@ vk_gltf_viewer::vulkan::pipeline::BrdfmapComputer::BrdfmapComputer(
         {},
         createPipelineStages(
             device,
-            vku::Shader::fromSpirvFile(
-                COMPILED_SHADER_DIR "/brdfmap.comp.spv",
+            vku::Shader {
+                shader::brdfmap_comp(),
                 vk::ShaderStageFlagBits::eCompute,
                 vku::unsafeAddress(vk::SpecializationInfo {
                     vku::unsafeProxy(vk::SpecializationMapEntry { 0, 0, sizeof(SpecializationConstants::numSamples) }),
                     vk::ArrayProxyNoTemporaries<const SpecializationConstants>(specializationConstants),
-                }))).get()[0],
+                }),
+            }).get()[0],
         *pipelineLayout,
     } } { }
 

@@ -9,6 +9,8 @@ export import glm;
 export import :vulkan.buffer.CubeIndices;
 export import :vulkan.dsl.Skybox;
 export import :vulkan.rp.Scene;
+import :vulkan.shader.skybox_vert;
+import :vulkan.shader.skybox_frag;
 
 namespace vk_gltf_viewer::vulkan::inline pipeline {
     export class SkyboxRenderer {
@@ -37,14 +39,15 @@ namespace vk_gltf_viewer::vulkan::inline pipeline {
             pipeline { device, nullptr, vku::getDefaultGraphicsPipelineCreateInfo(
                 createPipelineStages(
                     device,
-                    vku::Shader::fromSpirvFile(COMPILED_SHADER_DIR "/skybox.vert.spv", vk::ShaderStageFlagBits::eVertex),
-                    vku::Shader::fromSpirvFile(
-                        COMPILED_SHADER_DIR "/skybox.frag.spv",
+                    vku::Shader { shader::skybox_vert(), vk::ShaderStageFlagBits::eVertex },
+                    vku::Shader {
+                        shader::skybox_frag(),
                         vk::ShaderStageFlagBits::eFragment,
                         vku::unsafeAddress(vk::SpecializationInfo {
                             vku::unsafeProxy(vk::SpecializationMapEntry { 0, 0, sizeof(vk::Bool32) }),
                             vku::unsafeProxy<vk::Bool32>(isCubemapImageToneMapped),
-                        }))).get(),
+                        }),
+                    }).get(),
                 *pipelineLayout, 1, true, vk::SampleCountFlagBits::e4)
                 .setPRasterizationState(vku::unsafeAddress(vk::PipelineRasterizationStateCreateInfo {
                     {},

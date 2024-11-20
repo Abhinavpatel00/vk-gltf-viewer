@@ -4,6 +4,11 @@ import vku;
 export import :vulkan.pipeline.tag;
 export import :vulkan.pl.Primitive;
 export import :vulkan.rp.Scene;
+import :vulkan.shader.blend_faceted_primitive_frag;
+import :vulkan.shader.blend_primitive_frag;
+import :vulkan.shader.faceted_primitive_tesc;
+import :vulkan.shader.faceted_primitive_tese;
+import :vulkan.shader.faceted_primitive_vert;
 
 namespace vk_gltf_viewer::vulkan::inline pipeline {
     export struct BlendFacetedPrimitiveRenderer : vk::raii::Pipeline {
@@ -14,8 +19,8 @@ namespace vk_gltf_viewer::vulkan::inline pipeline {
         ) : Pipeline { device, nullptr, vku::getDefaultGraphicsPipelineCreateInfo(
                 createPipelineStages(
                     device,
-                    vku::Shader::fromSpirvFile(COMPILED_SHADER_DIR "/faceted_primitive.vert.spv", vk::ShaderStageFlagBits::eVertex),
-                    vku::Shader::fromSpirvFile(COMPILED_SHADER_DIR "/blend_faceted_primitive.frag.spv", vk::ShaderStageFlagBits::eFragment)).get(),
+                    vku::Shader { shader::faceted_primitive_vert(), vk::ShaderStageFlagBits::eVertex },
+                    vku::Shader { shader::blend_faceted_primitive_frag(), vk::ShaderStageFlagBits::eFragment }).get(),
                 *layout, 1, true, vk::SampleCountFlagBits::e4)
             .setPRasterizationState(vku::unsafeAddress(vk::PipelineRasterizationStateCreateInfo {
                 {},
@@ -68,10 +73,10 @@ namespace vk_gltf_viewer::vulkan::inline pipeline {
         ) : Pipeline { device, nullptr, vku::getDefaultGraphicsPipelineCreateInfo(
                 createPipelineStages(
                     device,
-                    vku::Shader::fromSpirvFile(COMPILED_SHADER_DIR "/faceted_primitive.vert.spv", vk::ShaderStageFlagBits::eVertex),
-                    vku::Shader::fromSpirvFile(COMPILED_SHADER_DIR "/faceted_primitive.tesc.spv", vk::ShaderStageFlagBits::eTessellationControl),
-                    vku::Shader::fromSpirvFile(COMPILED_SHADER_DIR "/faceted_primitive.tese.spv", vk::ShaderStageFlagBits::eTessellationEvaluation),
-                    vku::Shader::fromSpirvFile(COMPILED_SHADER_DIR "/blend_primitive.frag.spv", vk::ShaderStageFlagBits::eFragment)).get(),
+                    vku::Shader { shader::faceted_primitive_vert(), vk::ShaderStageFlagBits::eVertex },
+                    vku::Shader { shader::faceted_primitive_tesc(), vk::ShaderStageFlagBits::eTessellationControl },
+                    vku::Shader { shader::faceted_primitive_tese(), vk::ShaderStageFlagBits::eTessellationEvaluation },
+                    vku::Shader { shader::blend_primitive_frag(), vk::ShaderStageFlagBits::eFragment }).get(),
                 *layout, 1, true, vk::SampleCountFlagBits::e4)
             .setPTessellationState(vku::unsafeAddress(vk::PipelineTessellationStateCreateInfo {
                 {},

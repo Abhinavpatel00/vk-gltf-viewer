@@ -4,6 +4,8 @@ import std;
 export import glm;
 export import vku;
 export import :vulkan.rp.CubemapToneMapping;
+import :vulkan.shader.screen_quad_vert;
+import :vulkan.shader.cubemap_tone_mapping_frag;
 
 namespace vk_gltf_viewer::vulkan::inline pipeline {
     export class CubemapToneMappingRenderer {
@@ -33,8 +35,8 @@ namespace vk_gltf_viewer::vulkan::inline pipeline {
             pipeline { device, nullptr, vku::getDefaultGraphicsPipelineCreateInfo(
                 createPipelineStages(
                     device,
-                    vku::Shader::fromSpirvFile(COMPILED_SHADER_DIR "/screen_quad.vert.spv", vk::ShaderStageFlagBits::eVertex),
-                    vku::Shader::fromSpirvFile(COMPILED_SHADER_DIR "/cubemap_tone_mapping.frag.spv", vk::ShaderStageFlagBits::eFragment)).get(),
+                    vku::Shader { shader::screen_quad_vert(), vk::ShaderStageFlagBits::eVertex },
+                    vku::Shader { shader::cubemap_tone_mapping_frag(), vk::ShaderStageFlagBits::eFragment }).get(),
                 *pipelineLayout, 1)
                 .setPRasterizationState(vku::unsafeAddress(vk::PipelineRasterizationStateCreateInfo {
                     {},
