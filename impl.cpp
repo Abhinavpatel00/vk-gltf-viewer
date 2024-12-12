@@ -10,7 +10,11 @@
 #define WUFFS_CONFIG__MODULE__CRC32
 #define WUFFS_CONFIG__MODULE__DEFLATE
 #define WUFFS_CONFIG__MODULE__ZLIB
+#ifndef _MSC_VER
+// Currently wuffs does not used for JPEG decoding in Windows.
+// https://github.com/google/wuffs/issues/151
 #define WUFFS_CONFIG__MODULE__JPEG
+#endif
 #define WUFFS_CONFIG__MODULE__PNG
 #include <wuffs-unsupported-snapshot.c>
 

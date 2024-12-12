@@ -3,6 +3,7 @@ module;
 #include <cassert>
 #include <cerrno>
 #include <ktx.h>
+#include <stb_image.h>
 #include <vulkan/vulkan_hpp_macros.hpp>
 #define WUFFS_CONFIG__MODULES
 #define WUFFS_CONFIG__MODULE__AUX__BASE
@@ -12,7 +13,11 @@ module;
 #define WUFFS_CONFIG__MODULE__CRC32
 #define WUFFS_CONFIG__MODULE__DEFLATE
 #define WUFFS_CONFIG__MODULE__ZLIB
+#ifndef _MSC_VER
+// Currently wuffs does not used for JPEG decoding in Windows.
+// https://github.com/google/wuffs/issues/151
 #define WUFFS_CONFIG__MODULE__JPEG
+#endif
 #define WUFFS_CONFIG__MODULE__PNG
 #include <wuffs-unsupported-snapshot.c>
 
@@ -215,33 +220,40 @@ namespace vk_gltf_viewer::gltf {
                     const std::size_t imageIndex = usedImageIndices[i];
 
                     // 1. Create images and load data into staging buffers, collect the copy infos.
-
-                    // result WOULD BE DESTROYED IN THE FUNCTION (for reducing memory footprint)!
-                    // Therefore, I explicitly marked the parameter type of data as wuffs_aux::DecodeImageResult&&
-                    // (which force the user to pass it like std::move(result).
-                    const auto processNonCompressedImageFromLoadResult = [&](wuffs_aux::DecodeImageResult &&result) {
-                        const std::uint32_t channels = result.pixbuf.pixcfg.pixel_format().bits_per_pixel() / 8;
-                        assert(channels != 3 && "3-channel image is not supported: check if you're using Rgb2RgbaImageDecodeCallbacks");
-
-                        auto [data, width, height, _] = result.pixbuf.plane(0);
-                        assert(width % channels == 0 && "Why width is not divisible by channels?");
-                        width /= channels;
-
+                    const auto processNonCompressedImageFromLoadResult = [&](const std::byte *data, std::uint32_t width, std::uint32_t height, std::uint32_t channels) {
+#ifdef _MSC_VER
+						// Channel can be 3 only if using stbi_load, when decoding JPEG in Windows (see the caller code explanation).
+                        vku::MappedBuffer stagingBuffer{ gpu.allocator, vk::BufferCreateInfo {
+                            {},
+                            width * height * (channels == 3 ? 4 : channels),
+                            vk::BufferUsageFlagBits::eTransferSrc,
+                        } };
+                        if (channels == 3) {
+                            std::ranges::transform(
+                                std::views::counted(reinterpret_cast<const std::array<std::uint8_t, 3>*>(data), width * height),
+                                static_cast<std::array<std::uint8_t, 4>*>(stagingBuffer.data),
+                                [](const std::array<std::uint8_t, 3>& rgb) {
+									return std::array{ rgb[0], rgb[1], rgb[2], std::uint8_t{ 255 } };
+                                });
+                            channels = 4;
+                        }
+                        else {
+							std::copy_n(data, width * height * channels, static_cast<std::byte*>(stagingBuffer.data));
+                        }
+#else
                         vku::MappedBuffer stagingBuffer {
                             gpu.allocator,
-                            std::from_range, std::span { data, width * height * channels },
+                            std::from_range, std::views::counted(data, width * height * channels),
                             vk::BufferUsageFlagBits::eTransferSrc,
                         };
-
-                        // Release the memory ownership for reduced memory footprint.
-                        result.pixbuf_mem_owner.release();
+#endif
 
                         vku::AllocatedImage image { gpu.allocator, vk::ImageCreateInfo {
                             {},
                             vk::ImageType::e2D,
                             determineNonCompressedImageFormat(channels, imageIndex),
-                            { static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height), 1 },
-                            vku::Image::maxMipLevels(vk::Extent2D { static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height) }), 1,
+                            { width, height, 1 },
+                            vku::Image::maxMipLevels(vk::Extent2D { width, height }), 1,
                             vk::SampleCountFlagBits::e1,
                             vk::ImageTiling::eOptimal,
                             vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eSampled,
@@ -262,6 +274,22 @@ namespace vk_gltf_viewer::gltf {
                     };
 
                     const auto processNonCompressedImageFromMemory = [&](std::span<const std::uint8_t> memory) {
+#ifdef _MSC_VER
+                        // In Windows, wuffs' JPEG decoder is significantly slower than stb_image if AVX2 is not enabled, but enabling it causes
+                        // ICE in MSVC (see https://github.com/google/wuffs/issues/151). Therefore, stb_image should be used for this fallback
+                        // path.
+						if (std::ranges::starts_with(memory, std::initializer_list{ 0xFF, 0xD8, 0xFF })) {
+							int width, height, channels;
+							stbi_uc* data = stbi_load_from_memory(memory.data(), memory.size(), &width, &height, &channels, STBI_default);
+							if (!data) {
+								throw std::runtime_error{ std::format("Failed to load the image: {}", stbi_failure_reason()) };
+							}
+                            auto result = processNonCompressedImageFromLoadResult(reinterpret_cast<const std::byte*>(data), width, height, channels);
+							stbi_image_free(data);
+							return result;
+						}
+#endif
+
                         io::Rgb2RgbaDecodeImageCallbacks callbacks;
                         wuffs_aux::sync_io::MemoryInput input { memory.data(), memory.size_bytes() };
                         wuffs_aux::DecodeImageResult result = wuffs_aux::DecodeImage(callbacks, input);
@@ -269,12 +297,35 @@ namespace vk_gltf_viewer::gltf {
                             throw std::runtime_error { std::format("Failed to decode the image: {}", result.error_message) };
                         }
 
-                        return processNonCompressedImageFromLoadResult(std::move(result));
+                        const std::uint32_t channels = result.pixbuf.pixcfg.pixel_format().bits_per_pixel() / 8;
+                        assert(channels != 3 && "3-channel image is not supported: check if you're using Rgb2RgbaImageDecodeCallbacks");
+
+                        auto [data, width, height, _] = result.pixbuf.plane(0);
+                        assert(width % channels == 0 && "Why width is not divisible by channels?");
+                        width /= channels;
+
+                        return processNonCompressedImageFromLoadResult(reinterpret_cast<const std::byte*>(data), width, height, channels);
                     };
 
-                    const auto processNonCompressedImageFromFile = [&](const char *path) {
+                    const auto processNonCompressedImageFromFile = [&](const std::filesystem::path &path) {
+#ifdef _MSC_VER
+                        // In Windows, wuffs' JPEG decoder is significantly slower than stb_image if AVX2 is not enabled, but enabling it causes
+                        // ICE in MSVC (see https://github.com/google/wuffs/issues/151). Therefore, stb_image should be used for this fallback
+                        // path.
+                        if (ranges::one_of(path.extension(), ".jpg", ".jpeg")) {
+                            int width, height, channels;
+                            stbi_uc* data = stbi_load(PATH_C_STR(path), &width, &height, &channels, STBI_default);
+                            if (!data) {
+                                throw std::runtime_error{ std::format("Failed to load the image: {}", stbi_failure_reason()) };
+                            }
+                            auto result = processNonCompressedImageFromLoadResult(reinterpret_cast<const std::byte*>(data), width, height, channels);
+                            stbi_image_free(data);
+                            return result;
+                        }
+#endif
+
                         io::Rgb2RgbaDecodeImageCallbacks callbacks;
-                        FILE* const file = fopen(path, "rb");
+                        FILE* const file = fopen(PATH_C_STR(path), "rb");
                         wuffs_aux::sync_io::FileInput input { file };
                         wuffs_aux::DecodeImageResult result = DecodeImage(callbacks, input);
                         fclose(file);
@@ -282,7 +333,14 @@ namespace vk_gltf_viewer::gltf {
                             throw std::runtime_error { std::format("Failed to decode the image: {}", result.error_message) };
                         }
 
-                        return processNonCompressedImageFromLoadResult(std::move(result));
+                        const std::uint32_t channels = result.pixbuf.pixcfg.pixel_format().bits_per_pixel() / 8;
+                        assert(channels != 3 && "3-channel image is not supported: check if you're using Rgb2RgbaImageDecodeCallbacks");
+
+                        auto [data, width, height, _] = result.pixbuf.plane(0);
+                        assert(width % channels == 0 && "Why width is not divisible by channels?");
+                        width /= channels;
+
+                        return processNonCompressedImageFromLoadResult(reinterpret_cast<const std::byte*>(data), width, height, channels);
                     };
 
                     // WARNING: texture WOULD BE DESTROYED IN THE FUNCTION (for reducing memory footprint)!
@@ -404,7 +462,7 @@ namespace vk_gltf_viewer::gltf {
                                 ranges::one_of(extension, ".jpg", ".jpeg", ".png")) {
 
                                 if (uri.fileByteOffset == 0) {
-                                    return processNonCompressedImageFromFile(PATH_C_STR(assetDir / uri.uri.fspath()));
+                                    return processNonCompressedImageFromFile(assetDir / uri.uri.fspath());
                                 }
                                 else {
                                     // Non-zero file byte offset is not supported for stbi_load.
