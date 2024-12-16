@@ -1,0 +1,31 @@
+{
+  "dependencies": [
+    "boost-container",
+    "cstring-view",
+    "cgal",
+    "fastgltf",
+    "glfw3",
+    "glm",
+    {
+      "name": "imgui",
+      "features": [
+        "docking-experimental",
+        "glfw-binding",
+        "vulkan-binding"
+      ]
+    },
+    "imguizmo",
+    "ktx",
+    "mikktspace",
+    "nativefiledialog-extended",
+    "stb",
+    {
+      "name": "vku",
+      "features": [
+        "dynamic-dispatcher",
+        "std-module"
+      ]
+    },
+    "openexr"
+  ]
+}
